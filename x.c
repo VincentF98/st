@@ -210,6 +210,8 @@ static void (*handler[LASTEvent])(XEvent *) = {
 };
 
 /* Globals */
+static Color *normalcols;
+static Color *fadedcols;
 static DC dc;
 static XWindow xw;
 static XSelection xsel;
@@ -292,6 +294,7 @@ swapcolors(const Arg *dummy)
 {
 	usealtcolors = !usealtcolors;
 	xloadcols();
+	xclear(0, 0, win.w, win.h);
 	redraw();
 }
 
@@ -762,36 +765,55 @@ xloadcolor(int i, const char *name, Color *ncolor)
 }
 
 void
+genfadedcols()
+{
+	XRenderColor fadecolor = normalcols[8].color;
+	for(int i = 0; i < dc.collen; i++) {
+		XRenderColor color;
+		color.alpha = normalcols[i].color.alpha;
+		color.red = (fadeamount * fadecolor.red + (100-fadeamount)  * normalcols[i].color.red) / 100;
+		color.green = (fadeamount * fadecolor.green + (100-fadeamount)  * normalcols[i].color.green) / 100;
+		color.blue = (fadeamount * fadecolor.blue + (100-fadeamount)  * normalcols[i].color.blue) / 100;
+		XftColorAllocValue(xw.dpy, xw.vis, xw.cmap, &color, &fadedcols[i]);
+	}
+}
+
+void
 xloadcols(void)
 {
 	int i;
-	static int loaded;
+	static int loaded = 0;
 	Color *cp;
 
-	dc.collen = MAX(LEN(colorname), LEN(altcolorname));
-	dc.col = xmalloc(dc.collen * sizeof(Color));
-
 	if (loaded) {
-		for (cp = dc.col; cp < &dc.col[dc.collen]; ++cp)
+		for (cp = normalcols; cp < &normalcols[dc.collen]; ++cp)
+			XftColorFree(xw.dpy, xw.vis, xw.cmap, cp);
+		for (cp = fadedcols; cp < &fadedcols[dc.collen]; ++cp)
 			XftColorFree(xw.dpy, xw.vis, xw.cmap, cp);
 	} else {
 		dc.collen = MAX(LEN(colorname), 256);
-		dc.col = xmalloc(dc.collen * sizeof(Color));
+		normalcols = xmalloc(dc.collen * sizeof(Color));
+		fadedcols = xmalloc(dc.collen * sizeof(Color));
 	}
 
 	for (i = 0; i < dc.collen; i++)
-		if (!xloadcolor(i, NULL, &dc.col[i])) {
+		if (!xloadcolor(i, NULL, &normalcols[i])) {
 			if (getcolorname(i))
 				die("Could not allocate color '%s'\n", getcolorname(i));
 			else
 				die("could not allocate color %d\n", i);
 		}
 		if (USE_ARGB) {
-			dc.col[defaultbg].color.alpha = alpha << 8;
-			dc.col[defaultbg].color.red   = ((dc.col[defaultbg].color.red >> 8) * alpha / 255) << 8;
-			dc.col[defaultbg].color.green = ((dc.col[defaultbg].color.green >> 8) * alpha / 255) << 8;
-			dc.col[defaultbg].color.blue  = ((dc.col[defaultbg].color.blue >> 8) * alpha / 255) << 8;
+			normalcols[defaultbg].color.alpha = alpha << 8;
+			normalcols[defaultbg].color.red   = ((normalcols[defaultbg].color.red >> 8) * alpha / 255) << 8;
+			normalcols[defaultbg].color.green = ((normalcols[defaultbg].color.green >> 8) * alpha / 255) << 8;
+			normalcols[defaultbg].color.blue  = ((normalcols[defaultbg].color.blue >> 8) * alpha / 255) << 8;
 		}
+		genfadedcols();
+		if (IS_SET(MODE_FOCUSED))
+			dc.col = normalcols;
+		else
+			dc.col = fadedcols;
 		loaded = 1;
 }
 
@@ -1602,7 +1624,14 @@ xsettitle(char *p)
 int
 xstartdraw(void)
 {
-	return IS_SET(MODE_VISIBLE);
+	if(IS_SET(MODE_VISIBLE)) {
+		if (IS_SET(MODE_FOCUSED))
+			dc.col = normalcols;
+		else
+			dc.col = fadedcols;
+		return 1;
+	}
+	return 0;
 }
 
 void
@@ -1731,6 +1760,8 @@ focus(XEvent *ev)
 		if (IS_SET(MODE_FOCUS))
 			ttywrite("\033[O", 3, 0);
 	}
+	xclear(0, 0, win.w, win.h);
+	redraw();
 }
 
 int
