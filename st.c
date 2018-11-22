@@ -666,6 +666,24 @@ die(const char *errstr, ...)
 	exit(1);
 }
 
+char
+*getshwd()
+{
+	char *buf = malloc(30*sizeof(char));
+	snprintf(buf, 30, "/proc/%d/cwd", pid);
+	char* s;
+	ssize_t alloclen, len;
+	alloclen = 128;
+	s = malloc(alloclen);
+	while((len = readlink(buf, s, alloclen)) == alloclen) {
+		alloclen *= 2;
+		s = realloc(s, alloclen);
+	}
+	free(buf);
+	s[len] = 0;
+	return s;
+}
+
 void
 execsh(char *cmd, char **args)
 {

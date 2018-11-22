@@ -99,6 +99,8 @@ typedef struct {
 	const Arg arg;
 } MouseKey;
 
+char *getshwd();
+
 void die(const char *, ...);
 void redraw(void);
 void draw(void);
@@ -135,6 +137,8 @@ char *xstrdup(char *);
 
 void kscrolldown(const Arg *);
 void kscrollup(const Arg *);
+void split(const Arg *);
+
 
 /* config.h globals */
 extern char *utmp;
