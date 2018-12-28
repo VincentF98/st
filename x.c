@@ -767,7 +767,7 @@ xloadcolor(int i, const char *name, Color *ncolor)
 	void
 genfadedcols()
 {
-	XRenderColor fadecolor = normalcols[8].color;
+	XRenderColor fadecolor = normalcols[fadecolorindex].color;
 	for(int i = 0; i < dc.collen; i++) {
 		XRenderColor color;
 		color.alpha = normalcols[i].color.alpha;
